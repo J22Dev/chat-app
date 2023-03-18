@@ -9,11 +9,31 @@ import {
 import { authMiddleware } from "../middleware/auth.middleware";
 import { valMiddleware } from "../middleware/validation.middleware";
 import { getUsersModel } from "./users.models";
+import {
+  createUserProfileHandler,
+  deleteUserProfileHandler,
+  getUserProfileHandler,
+  updateUserProfileHandler,
+} from "./profiles/profiles.controller";
 
 export const userRouter = Router();
 
 userRouter
-  .put("/:userId", authMiddleware, upload.single("avatar"), updateUserHandler)
+  .put("/:userId", authMiddleware, updateUserHandler)
   .delete("/:userId", authMiddleware, deleteUserHandler)
   .get("/:userId", authMiddleware, getUserByIdHandler)
-  .get("/", authMiddleware, valMiddleware(getUsersModel), getUsersHandler);
+  .get("/", authMiddleware, valMiddleware(getUsersModel), getUsersHandler)
+  .post(
+    "/:userId/profile",
+    authMiddleware,
+    upload.single("avatar"),
+    createUserProfileHandler
+  )
+  .put(
+    "/:userId/profile",
+    authMiddleware,
+    upload.single("avatar"),
+    updateUserProfileHandler
+  )
+  .delete("/:userId/profile", authMiddleware, deleteUserProfileHandler)
+  .get("/:userId/profile", authMiddleware, getUserProfileHandler);

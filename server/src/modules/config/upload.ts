@@ -30,6 +30,9 @@ const s3Storage = ms3({
       ext: path.extname(file.originalname),
     });
   },
+  acl(req, file, callback) {
+    callback(null, "public-read");
+  },
 });
 const ACCEPTED_TYPES = [
   "image/gif",
