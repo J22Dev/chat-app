@@ -1,63 +1,56 @@
 import { RequestHandler } from "express";
 import { db } from "../config/db";
-import { GetManyUsersModel, UpdateUserModel } from "./users.models";
 import {
   hashPassword,
   signUserTokens,
   verifyPassword,
 } from "../auth/auth.utils";
-import { cookieOptions } from "../auth/auth.controller";
+import { GetUsersModel, UserUpdateModel } from "./users.models";
+import { BUCKET, COOKIE_OPTIONS } from "../config/config";
+
+export const deleteUserHandler: RequestHandler = async (req, res, next) => {};
 
 export const updateUserHandler: RequestHandler = async (req, res, next) => {
   try {
-    const reqId = req.params.userId;
-    const tokenId = (req as any).userId;
-    if (reqId !== tokenId) return res.status(403);
-    const { password, newPassword, email, ...rest } =
-      req.body as UpdateUserModel;
-    const foundUser = await db.user.findUnique({
-      where: { email },
-    });
-    if (
-      !foundUser ||
-      (foundUser && !(await verifyPassword(foundUser.password, password)))
-    ) {
+    const requesterId = (req as any).userId;
+    const userId = req.params.userId;
+    if (userId !== requesterId)
+      return res.status(403).json({ message: "Forbidden" });
+    const foundUser = await db.user.findUnique({ where: { id: userId } });
+    if (!foundUser) return res.status(403);
+    const { password, ...rest } = foundUser;
+    const userData = req.body as UserUpdateModel;
+    const isPassValid = await verifyPassword(password, userData.password);
+    if (!isPassValid)
       return res.status(401).json({ message: "Not Authorized" });
+    const hashedPassword = userData.newPassword
+      ? await hashPassword(userData.newPassword)
+      : password;
+    const validEmail =
+      foundUser.email === userData.email ||
+      !(await db.user.findFirst({ where: { email: userData.email } }));
+    const validUserName =
+      foundUser.userName === userData.userName ||
+      !(await db.user.findFirst({ where: { userName: userData.userName } }));
+    if (!validEmail || !validUserName) {
+      return res
+        .status(400)
+        .json({ message: !validEmail ? "Email In Use" : "User Name In Use" });
     }
-    const userNameValid =
-      foundUser.userName === rest.userName ||
-      !(await db.user.findUnique({ where: { userName: rest.userName } }));
-    if (!userNameValid)
-      return res.status(400).json({ message: "User Name In Use" });
     const updatedUser = await db.user.update({
-      where: { id: foundUser.id },
-      data: {
-        ...rest,
-        password: newPassword
-          ? await hashPassword(newPassword)
-          : foundUser.password,
-      },
+      where: { id: userId },
+      data: { ...userData, password: hashedPassword },
     });
-    const { password: dbPass, ...restOfUser } = updatedUser;
+    const { password: uPass, ...user } = updatedUser;
     const { accessToken, refreshToken } = signUserTokens({ sub: foundUser.id });
     await db.userToken.update({
-      where: { userId: foundUser.id },
-      data: {
-        token: refreshToken,
-      },
+      where: { userId },
+      data: { token: refreshToken },
     });
     return res
-      .cookie("refreshToken", refreshToken, cookieOptions)
+      .cookie("refreshToken", refreshToken, COOKIE_OPTIONS)
       .status(200)
-      .json({ user: restOfUser, accessToken });
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const deleteUserHandler: RequestHandler = async (req, res, next) => {
-  try {
-    //Delete tokens, profile, files, contacts, messages, and participants
+      .json({ user, accessToken });
   } catch (error) {
     next(error);
   }
@@ -65,39 +58,34 @@ export const deleteUserHandler: RequestHandler = async (req, res, next) => {
 
 export const getUserByIdHandler: RequestHandler = async (req, res, next) => {
   try {
-    const reqId = req.params.userId;
-    const foundUser = await db.user.findUnique({ where: { id: reqId } });
-    if (!foundUser) return res.status(404).json({ message: "No User Found" });
-    const { password, ...rest } = foundUser;
-    return res.status(200).json({ user: rest });
+    const userId = req.params.userId;
+    const foundUser = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        userName: true,
+        dateCreated: true,
+        dateUpdated: true,
+      },
+    });
+    if (!foundUser) return res.status(404).json({ message: "User Not Found" });
+    return res.status(200).json(foundUser);
   } catch (error) {
     next(error);
   }
 };
-
-export const getManyUsersHandler: RequestHandler = async (req, res, next) => {
-  const {
-    search = "",
-    page = "1",
-    size = "10",
-  } = req.query as GetManyUsersModel;
-  const pageNumber = parseInt(page as string);
-  const pageSize = parseInt(size as string);
-  const skip = Math.max(0, (pageNumber - 1) * pageSize);
+export const getUsersHandler: RequestHandler = async (req, res, next) => {
   try {
-    const users = await db.user.findMany({
+    const { query, page, size } = req.query as GetUsersModel;
+    const skip = (parseInt(page) - 1) * parseInt(size);
+    const foundUsers = await db.user.findMany({
       where: {
         OR: [
-          {
-            userName: {
-              startsWith: search! as string,
-            },
-          },
-          {
-            email: {
-              startsWith: search! as string,
-            },
-          },
+          { userName: { startsWith: query } },
+          { email: { startsWith: query } },
         ],
       },
       select: {
@@ -109,10 +97,10 @@ export const getManyUsersHandler: RequestHandler = async (req, res, next) => {
         dateCreated: true,
         dateUpdated: true,
       },
+      take: parseInt(size),
       skip,
-      take: pageSize,
     });
-    return res.status(200).json(users);
+    return res.status(200).json([...foundUsers]);
   } catch (error) {
     next(error);
   }

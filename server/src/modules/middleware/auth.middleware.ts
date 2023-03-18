@@ -1,6 +1,5 @@
 import { RequestHandler } from "express";
-import jwt from "jsonwebtoken";
-import { JWT_ACCESS_SECRET } from "../config/config";
+import { verifyUserToken } from "../auth/auth.utils";
 
 export const authMiddleware: RequestHandler = async (req, res, next) => {
   try {
@@ -10,20 +9,11 @@ export const authMiddleware: RequestHandler = async (req, res, next) => {
       return res.status(401).json({ message: "Not Authorized" });
     }
     const token = (bearerToken as string).split(" ")[1];
-    const decoded = await new Promise<{ sub: string }>((resolve, reject) => {
-      jwt.verify(token, JWT_ACCESS_SECRET, (err, decoded) => {
-        if (err) {
-          reject(new Error("Token Not Valid"));
-        } else {
-          resolve(decoded as { sub: string });
-        }
-      });
-    });
+    const decoded = await verifyUserToken({ type: "ACCESS", payload: token });
+    if (!decoded) return res.status(401).json({ message: "Not Authorized" });
     if ("sub" in decoded) {
       (req as any).userId = decoded.sub;
       next();
-    } else {
-      return res.status(401).json({ message: "Not Authorized" });
     }
   } catch (error) {
     next(error);

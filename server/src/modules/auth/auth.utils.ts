@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 import argon from "argon2";
-import { JWT_ACCESS_SECRET, JWT_REFRESH_SECRET } from "../config/config";
+import { JWT } from "../config/config";
 
 export const hashPassword = (pass: string) => argon.hash(pass);
 export const verifyPassword = (hash: string, plain: string) =>
@@ -12,8 +12,8 @@ type SignTokenPayload = { type: TokenType; payload: TokenPayload };
 
 export const getTokenConfig = (type: TokenType) => {
   return type === "ACCESS"
-    ? { expiresIn: "15m", secret: JWT_ACCESS_SECRET }
-    : { secret: JWT_REFRESH_SECRET, expiresIn: "7d" };
+    ? { expiresIn: "15m", secret: JWT.ACCESS_SECRET }
+    : { secret: JWT.REFRESH_SECRET, expiresIn: "7d" };
 };
 
 export const signToken = ({ type, payload }: SignTokenPayload) => {

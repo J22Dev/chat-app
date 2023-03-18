@@ -1,40 +1,19 @@
 import { Router } from "express";
+import { upload } from "../config/upload";
 import {
-  getManyUsersHandler,
+  deleteUserHandler,
   getUserByIdHandler,
+  getUsersHandler,
   updateUserHandler,
 } from "./users.controller";
-import { valMiddleware } from "../middleware/validation.middleware";
-import {
-  getManyUsersModel,
-  getUserByIdModel,
-  updateUserModel,
-} from "./users.models";
 import { authMiddleware } from "../middleware/auth.middleware";
+import { valMiddleware } from "../middleware/validation.middleware";
+import { getUsersModel } from "./users.models";
 
 export const userRouter = Router();
 
 userRouter
-  .put(
-    "/:userId",
-    authMiddleware,
-    valMiddleware(updateUserModel),
-    updateUserHandler
-  )
-  .get(
-    "/:userId",
-    authMiddleware,
-    valMiddleware(getUserByIdModel),
-    getUserByIdHandler
-  )
-  .get(
-    "/",
-    authMiddleware,
-    valMiddleware(getManyUsersModel),
-    getManyUsersHandler
-  )
-  .delete("/:userId")
-  .post("/:userId/profile")
-  .put("/:userId/profile")
-  .get("/:userId/profile")
-  .delete("/:userId/profile");
+  .put("/:userId", authMiddleware, upload.single("avatar"), updateUserHandler)
+  .delete("/:userId", authMiddleware, deleteUserHandler)
+  .get("/:userId", authMiddleware, getUserByIdHandler)
+  .get("/", authMiddleware, valMiddleware(getUsersModel), getUsersHandler);

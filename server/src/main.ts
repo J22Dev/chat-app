@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import cParser from "cookie-parser";
-import { PORT } from "./modules/config/config";
+import { APP } from "./modules/config/config";
 import { errorMiddleware } from "./modules/middleware/error.middleware";
 import { authRouter } from "./modules/auth/auth.routes";
 import { userRouter } from "./modules/users/users.routes";
@@ -16,6 +16,6 @@ app.use("/api/v1/users", userRouter);
 app.use(errorMiddleware);
 
 const main = async () => {
-  app.listen(PORT, () => console.log(`Running On Port: ${PORT}`));
+  app.listen(APP.PORT, () => console.log(`Running On Port: ${APP.PORT}`));
 };
 main();
